@@ -119,10 +119,3 @@ cd IoT_Storage
 ```
 
 A partir de aquí, entra a la carpeta del punto que quieras desplegar (`Archivo/`, `Motor/MotorLocal/`, `Motor/RDS/`, `Contenedores/S3/`) y sigue su README específico — ahí solo aparecen las variables de entorno, el build/run del contenedor y la verificación propias de ese backend.
-
-## Notas de seguridad generales
-
-- No subas archivos `.pem` al repositorio (ya cubierto por `.gitignore`).
-- Sin una Elastic IP, la IP pública de la EC2 cambia si la instancia se detiene y se vuelve a iniciar — hay que actualizarla en el firmware del sensor y en las URLs de prueba.
-- Todo el despliegue usa HTTP plano, válido para esta práctica de laboratorio; una implementación real usaría HTTPS.
-- Cada README de punto trae las notas de seguridad específicas de su backend (Security Group de la base de datos, alcance del IAM Role de S3, etc.).
