@@ -1,22 +1,20 @@
-# Punto 1 — Servidor IoT Flask en Docker sobre EC2
+# Punto 1 — Archivo (.db SQLite) en Docker sobre EC2
 
 Este componente corresponde a la carpeta **`Archivo`** del proyecto. Implementa un servidor Flask que recibe peticiones HTTP desde los componentes IoT, almacena sus lecturas en una base de datos SQLite local y muestra un panel web de monitoreo estilo Cyberpunk.
 
 El servidor se ejecuta dentro de un contenedor Docker en una instancia Amazon EC2. La base SQLite se conserva fuera del contenedor mediante un volumen, por lo que las lecturas sobreviven a reinicios o recreaciones del contenedor.
 
-## Estructura general del proyecto
+> Los pasos genéricos de EC2 (crear la instancia, Security Group, instalar Docker/Git, clonar el repo) están en el [README raíz](../README.md#aprovisionamiento-de-la-instancia-ec2-una-sola-vez). Aquí solo va lo específico de este punto.
+
+## Estructura de esta carpeta
 
 ```text
-Proyecto-IoT/
-├── Archivo/                  # Este componente: servidor Flask + SQLite + Docker
-│   ├── app.py
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── .dockerignore
-│   └── README.md
-├── Contenedores/             # Configuración o prácticas de contenedores
-├── Motor/                    # Código relacionado con el actuador o motor
-└── Sensor/                   # Código del dispositivo/sensor IoT (LilyGO T-Beam)
+Archivo/
+├── app.py
+├── Dockerfile
+├── requirements.txt
+├── .dockerignore
+└── datos.db          # se crea/actualiza en tiempo de ejecución
 ```
 
 ## Funcionalidades
@@ -30,18 +28,7 @@ Proyecto-IoT/
 - Slider en la interfaz para mostrar u ocultar un formulario que simula peticiones IoT manuales.
 - Visualización de última lectura, fecha, hora, tiempo transcurrido y las últimas lecturas recibidas.
 
-## Requisitos
-
-- Una instancia EC2 Ubuntu con acceso SSH.
-- Un Security Group con las siguientes reglas de entrada:
-
-| Tipo | Protocolo | Puerto | Origen recomendado |
-|---|---|---:|---|
-| SSH | TCP | 22 | Tu IP pública |
-| HTTP | TCP | 80 | `0.0.0.0/0` para permitir dispositivos externos |
-
-- Repositorio GitHub con esta estructura de carpetas.
-- Git y Docker instalados en la instancia.
+Este punto usa el puerto **80** de la EC2 (ya incluido en el Security Group común, ver README raíz).
 
 ## Archivos necesarios en `Archivo/`
 
@@ -94,93 +81,11 @@ datos.db
 
 Se excluye `datos.db` del contexto de construcción porque la base debe persistir en el host EC2, no dentro de la imagen Docker.
 
-## Despliegue desde GitHub hacia EC2
+## Despliegue
 
-Los siguientes pasos se ejecutan una vez para instalar y poner en marcha el proyecto.
+Dentro de la EC2, ya con el repo clonado (ver README raíz):
 
-### 1. Conectarse a la instancia EC2
-
-Desde el computador local, ubícate en la carpeta donde tienes la llave privada:
-
-```bash
-ssh -i labsuser.pem ubuntu@<IP_PUBLICA_EC2>
-```
-
-> En una AMI Ubuntu, el usuario predeterminado es `ubuntu`. Si usas Amazon Linux, normalmente es `ec2-user`.
-
-### 2. Instalar Git y Docker
-
-Dentro de la instancia EC2:
-
-```bash
-sudo apt update
-sudo apt install -y git docker.io
-sudo systemctl enable --now docker
-sudo usermod -aG docker ubuntu
-```
-
-Cierra la conexión para aplicar el nuevo grupo del usuario:
-
-```bash
-exit
-```
-
-Después, vuelve a entrar por SSH:
-
-```bash
-ssh -i labsuser.pem ubuntu@<IP_PUBLICA_EC2>
-```
-
-Comprueba que Docker funciona sin `sudo`:
-
-```bash
-docker --version
-docker ps
-```
-
-### 3. Clonar el repositorio de GitHub
-
-Dentro de EC2, clona el repositorio:
-
-```bash
-cd /home/ubuntu
-git clone https://github.com/SVA999/IoT_Storage.git
-```
-
-Entra específicamente a la carpeta **Archivo**:
-
-```bash
-cd /home/ubuntu/IoT_Storage/Archivo
-```
-
-Verifica que estén los archivos requeridos:
-
-```bash
-ls -la
-```
-
-Debes ver como mínimo:
-
-```text
-app.py
-Dockerfile
-requirements.txt
-.dockerignore
-README.md
-```
-
-### 4. Detener el servicio Flask anterior, si existe
-
-Si anteriormente corrías Flask con systemd y Gunicorn directamente, libera el puerto 80 antes de iniciar Docker:
-
-```bash
-sudo systemctl stop flaskapp
-sudo systemctl disable flaskapp
-```
-
-Este paso se ejecuta una sola vez. Docker será el responsable de mantener el servidor activo.
-
-### 5. Construir la imagen Docker
+### 1. Construir la imagen Docker
 
 Ubicado en la carpeta `Archivo`:
 
@@ -194,7 +99,7 @@ Comprueba que se creó la imagen:
 docker images
 ```
 
-### 6. Ejecutar el contenedor permanentemente
+### 2. Ejecutar el contenedor permanentemente
 
 Ejecuta el siguiente comando desde `Archivo`:
 
@@ -400,5 +305,3 @@ Panel web: GET http://<IP_EC2>/
 
 - Este despliegue usa HTTP, adecuado para laboratorio y pruebas controladas. En una implementación real conviene usar HTTPS con Nginx y certificados TLS.
 - El endpoint `DELETE /datos` no tiene autenticación: cualquier persona que conozca la IP puede vaciar los datos si el puerto está público. Para un proyecto real, se debe proteger con API key, autenticación o una red privada.
-- No subas archivos `.pem` al repositorio de GitHub.
-- En una instancia EC2 sin Elastic IP, la IP pública puede cambiar si la instancia se detiene y se inicia nuevamente.

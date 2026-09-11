@@ -1,0 +1,31 @@
+version: "3.8"
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb-iot
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: iot_local
+      MARIADB_USER: iot_user
+      MARIADB_PASSWORD: iot_pass
+      MARIADB_ROOT_PASSWORD: root_pass_change_me
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  app:
+    build: .
+    container_name: flask-motorlocal
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_USER: iot_user
+      DB_PASSWORD: iot_pass
+      DB_NAME: iot_local
+    ports:
+      - "8002:8000"
+
+volumes:
+  mariadb_data:

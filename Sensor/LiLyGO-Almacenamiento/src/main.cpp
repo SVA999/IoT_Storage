@@ -12,7 +12,15 @@ const char* password = "";
 // Debe incluir /datos, porque ese es el endpoint POST de Flask.
 // Usamos HTTP por ahora para pruebas.
 // Cuando agregues HTTPS, se usa WiFiClientSecure.
-const char* serverUrl = "http://44.223.60.154/datos";
+// Los 4 puntos de la practica corren en paralelo en la misma EC2,
+// cada uno en su propio puerto, asi que se envia el mismo heartbeat a los 4.
+const char* serverUrls[] = {
+  "http://44.223.60.154:80/datos",    // Punto 1 - Archivo (.db SQLite)
+  "http://44.223.60.154:8002/datos",  // Punto 2 - Motor Local (MariaDB)
+  "http://44.223.60.154:8003/datos",  // Punto 3 - Motor Externo (AWS RDS MySQL)
+  "http://44.223.60.154:8004/datos"   // Punto 4 - Contenedor + boto3 (AWS S3)
+};
+const int cantidadServidores = sizeof(serverUrls) / sizeof(serverUrls[0]);
 
 // Identificador logico del dispositivo
 const char* deviceId = "lilygo-tbeam-01";
@@ -66,12 +74,10 @@ void enviarPeticion() {
     }
   }
 
-  WiFiClient client;
-  HTTPClient http;
-
-  Serial.println("\n[HTTP] Preparando POST al servidor...");
+  Serial.println("\n[HTTP] Preparando POST hacia los 4 puntos de la practica...");
 
   // JSON simple: no GPS, no temperatura, no sensores.
+  // Se arma una sola vez y se reenvia igual a los 4 servidores.
   contadorMensajes++;
 
   String payload = "{";
@@ -85,31 +91,33 @@ void enviarPeticion() {
   Serial.println("[HTTP] Payload:");
   Serial.println(payload);
 
-  // Inicializa la solicitud HTTP hacia EC2.
-  http.begin(client, serverUrl);
-  http.addHeader("Content-Type", "application/json");
+  // Envia el mismo payload a cada punto por separado: si uno falla
+  // (por ejemplo el RDS externo), los demas igual quedan registrados.
+  for (int i = 0; i < cantidadServidores; i++) {
+    WiFiClient client;
+    HTTPClient http;
 
-  // Ejecuta POST y recibe el codigo HTTP.
-  int codigoRespuesta = http.POST(payload);
+    http.begin(client, serverUrls[i]);
+    http.addHeader("Content-Type", "application/json");
 
-  if (codigoRespuesta > 0) {
-    Serial.print("[HTTP] Codigo de respuesta: ");
-    Serial.println(codigoRespuesta);
+    int codigoRespuesta = http.POST(payload);
 
-    String respuesta = http.getString();
-    Serial.print("[HTTP] Respuesta del servidor: ");
-    Serial.println(respuesta);
+    Serial.print("[HTTP] Punto ");
+    Serial.print(i + 1);
+    Serial.print(" (");
+    Serial.print(serverUrls[i]);
+    Serial.print(") -> ");
 
-    if (codigoRespuesta == 201) {
-      Serial.println("[OK] Peticion registrada en SQLite.");
+    if (codigoRespuesta > 0) {
+      Serial.print("codigo ");
+      Serial.println(codigoRespuesta);
+    } else {
+      Serial.print("error ");
+      Serial.println(http.errorToString(codigoRespuesta));
     }
-  } else {
-    Serial.print("[HTTP] Error: ");
-    Serial.println(http.errorToString(codigoRespuesta));
-  }
 
-  // Libera la conexion y recursos del cliente HTTP.
-  http.end();
+    http.end();
+  }
 }
 
 void setup() {

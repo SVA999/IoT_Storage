@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+*.pem
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+
+# Ejemplos dejados por el profesor: no deben subirse al repo
+Contenedores/ejemplo almacenamiento contenedores/
+**/ejemplo*/
+**/EJEMPLO*
+**/Ejemplo*
